@@ -1,5 +1,7 @@
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test.py", "test_*.py", "*_test.py"]
-addopts = ["-ra"]
+testpaths=["tests"]
 
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+extend-exclude = "/previous/"

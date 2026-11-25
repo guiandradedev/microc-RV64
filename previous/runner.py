@@ -1,64 +1,45 @@
-from __future__ import annotations
+"""Execute o frontend e gere, inspecione ou teste a pseudoRV64."""
 
-import load_previous  # Disponibiliza os módulos das etapas anteriores.
-
+# O carregador deve preceder os imports dos módulos do frontend.
+import load_previous
 import argparse
 from pathlib import Path
-
 from Lexer import Lexer, LexerError
-from cfg import format_cfg
-from cfg_builder import CFGBuilder
-from name_resolver import resolve_names
 from parser import Parser, ParserError
 from semantic import SemanticAnalyzer
 from semantic_errors import SemanticError
-from type_checker import check_types
+from codegen import CodeGenerator
+from executor import Interpreter, validate
+from ir import format_ir
 
 
-def main(argv: list[str] | None = None) -> int:
-    argument_parser = argparse.ArgumentParser(
-        description="Execute a Análise Semântica 2 da MicroC."
-    )
-    argument_parser.add_argument("source", type=Path, metavar="arquivo.mc")
-    modes = argument_parser.add_mutually_exclusive_group()
-    modes.add_argument(
-        "--cfg-only", action="store_true",
-        help="construa e mostre os CFGs, após validar nomes e tipos",
-    )
-    modes.add_argument(
-        "--dump-cfg", action="store_true",
-        help="mostre os CFGs após a validação semântica completa",
-    )
-    args = argument_parser.parse_args(argv)
-
+def main():
+    p = argparse.ArgumentParser(description="Gere e execute pseudoRV64.")
+    p.add_argument("source", type=Path)
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--run", action="store_true")
+    mode.add_argument("--dump-ir", action="store_true")
+    p.add_argument("--max-steps", type=int, default=100000)
+    args = p.parse_args()
     try:
-        source = args.source.read_text(encoding="utf-8")
-        program = Parser(Lexer(source).scan()).parse()
-        if args.cfg_only:
-            resolve_names(program)
-            check_types(program)
-            for function in program.functions:
-                print(format_cfg(CFGBuilder().build(function)))
-            print("CFG construído. A análise de fluxo não foi executada.")
-            return 0
-
+        program = Parser(Lexer(args.source.read_text()).scan()).parse()
+        # Nenhuma geração ocorre se o frontend rejeitar o programa.
         SemanticAnalyzer().analyze(program)
-        if args.dump_cfg:
-            for function in program.functions:
-                print(format_cfg(function.metadata["cfg"]))
-    except (OSError, UnicodeError) as error:
-        argument_parser.error(f"erro ao ler {str(args.source)!r}: {error}")
-        return 2
-    except (LexerError, ParserError, SemanticError) as error:
-        argument_parser.exit(1, f"{error}\n")
-        return 1
-    except NotImplementedError as error:
-        argument_parser.exit(3, f"scaffold incompleto: {error}\n")
-        return 3
-
-    print("programa válido na Análise Semântica 2")
-    return 0
+        ir = CodeGenerator().generate(program)
+        validate(ir)
+        if args.run:
+            print(Interpreter().run(ir, args.max_steps).stdout, end="")
+        else:
+            print(format_ir(ir))
+    except (LexerError, ParserError, SemanticError) as e:
+        p.exit(1, str(e) + "\n")
+    except (OSError, UnicodeError) as e:
+        p.exit(2, str(e) + "\n")
+    except NotImplementedError as e:
+        p.exit(3, str(e) + "\n")
+    except (ValueError, RuntimeError) as e:
+        p.exit(4, str(e) + "\n")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
