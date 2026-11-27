@@ -48,7 +48,9 @@ def build_cfg(function):
     sorted_initializer = sorted(initializers) # Ordena os inicializadores para criar os blocos na ordem correta
     blocks: dict[int, BasicBlock] = {}
     for position, start in enumerate(sorted_initializer):
-        # O stop do bloco é o próximo inicializador, ou total_ins caso seja o último bloco
+        # position + 1 = próximo bloco
+
+        # O stop do bloco é o próximo inicializador ou total_ins se for o ultimo bloco
         stop = sorted_initializer[position + 1] if position + 1 < len(sorted_initializer) else total_ins
 
         # Cria o bloco e o insere no dicionário sem os pred. e succ. que serão preenchidos na próxima iteração
